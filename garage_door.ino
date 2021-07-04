@@ -1,93 +1,156 @@
 #include <NilRTOS.h>
 #include <SoftwareSerial.h>
 #include <Motor.h>
-
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 // Sensor inputs to know if the doors are fully open or closed
-#define s1_cls  2
-#define s1_opn  3
-#define s2_cls  4
-#define s2_opn  5
+#define s1_cls_pin 2
+#define s1_opn_pin 3
+#define s2_cls_pin 4
+#define s2_opn_pin 5
 
 // Relay outputs
 #define buzzer   6
 #define doorlock 7
 #define led 13
 
-#define motor1 0
-#define motor2 1
-#define open  0
-#define close 1
+// bluetooth serial
+#define rx_bt 11
+#define tx_bt 12
 
-Motor motor(A0,A1,A2,A3,A4,A5,A6);
-SoftwareSerial SerialBT(11, 12); // RX, TX
+// motor outputs
+#define ena A6
+#define enb A7
+#define in1 A0
+#define in2 A1
+#define in3 A2
+#define in4 A3
+
+const int motor1 = 0;
+const int motor2 = 1;
+const int open = 0;
+const int close = 1;
+
+Motor motor(ena, enb, in1, in2, in3, in4);
+SoftwareSerial SerialBT(rx_bt, tx_bt);
 
 volatile bool flag_open= false;
 volatile bool flag_close = false;
 volatile bool flag_stop = false;
 
+volatile bool sensor1_open, sensor2_open, sensor1_close, sensor2_close;
+
 char message[20];
+char m1[15];
+char m2[15];
+
+void read_sensors() {
+  sensor1_open = digitalRead(s1_opn_pin);
+  sensor2_open = digitalRead(s2_opn_pin);
+  sensor1_close = digitalRead(s1_cls_pin);
+  sensor2_close = digitalRead(s2_cls_pin);
+}
 
 void open_door() {
-  flag_open=false;
-  motor.on(motor1, open);
-  motor.on(motor2, open);
+  Serial.println("... opening");
   sprintf(message, "opening");
-  nilThdSleepS(5);
+  while (flag_open) {
+    read_sensors();
+    if (!sensor1_close) {
+      motor.on(motor1, open);
+      sprintf(m1, "opening");
+    }
+    if (!sensor2_close && !sensor1_open) {
+      motor.on(motor2, open);
+      sprintf(m2, "opening");
+    }
+    if (sensor1_close && sensor2_close) {
+      sprintf(message, "opened");
+      break;
+    }
+    nilThdSleepMilliseconds(10);
+  }
+  motor.off(motor1);
+  sprintf(m1, "off");
+  motor.off(motor2);
+  sprintf(m2, "off");
+  flag_open=false;
 }
 
 void close_door() {
-  flag_close=false;
-  motor.on(motor1, close);
-  motor.on(motor2, close);
+  Serial.println("... clossing");
   sprintf(message, "closing");
-  nilThdSleepS(5);
+  while (flag_close) {
+    read_sensors();
+    if (!sensor1_open) {
+      motor.on(motor1, close);
+      sprintf(m1, "closing");
+    }
+    if (!sensor2_open && !sensor2_close) {
+      motor.on(motor2, close);
+      sprintf(m2, "closing");
+    }
+    if (sensor1_open && sensor2_open) {
+      sprintf(message, "closed");
+      break;
+    }
+    nilThdSleepMilliseconds(10);
+  }
+  motor.off(motor1);
+  sprintf(m1, "off");
+  motor.off(motor2);
+  sprintf(m2, "off");
+  flag_close=false;
 }
 
 void stop_door() {
-  flag_stop=false;
+  Serial.println("... stopping");
   motor.off(motor1);
+  sprintf(m1, "off");
   motor.off(motor2);
-  sprintf(message, "stop");
-  nilThdSleepS(5);
+  sprintf(m2, "off");
+  sprintf(message, "stopped");
+  flag_stop=false;
 }
 
 void pinConfig() {
-  pinMode(s1_cls, INPUT_PULLUP);
-  pinMode(s1_opn, INPUT_PULLUP);
-  pinMode(s2_cls, INPUT_PULLUP);
-  pinMode(s2_opn, INPUT_PULLUP);
+  pinMode(s1_cls_pin, INPUT_PULLUP);
+  pinMode(s1_opn_pin, INPUT_PULLUP);
+  pinMode(s2_cls_pin, INPUT_PULLUP);
+  pinMode(s2_opn_pin, INPUT_PULLUP);
 
   pinMode(buzzer, OUTPUT);
   pinMode(doorlock, OUTPUT);
-
-  pinMode(en1, OUTPUT);
-  pinMode(en2, OUTPUT);
-  pinMode(dir1_a, OUTPUT);
-  pinMode(dir1_b, OUTPUT);
-  pinMode(dir2_a, OUTPUT);
-  pinMode(dir2_b, OUTPUT);
 }
 
 void serialConfig() {
   Serial.begin(115200);
   SerialBT.begin(9600);
   Serial.println("... start debug serial");
-  sprintf(message, "begin");
   SerialBT.println("... start bluetooth serial");
 }
 
 void processCommand() {
   char c = SerialBT.read();
-  flag_open = flag_close = flag_stop = false;
-  switch (c) {
-    case 'o':
-      flag_open = true; break;
-    case 'c':
-      flag_close = true; break;
-    case 's':
-      flag_stop = true; break;
-    default:
-      break;
+  if ((c=='o') || (c=='c') || (c=='s')) {
+    flag_open  = false;
+    flag_close = false;
+    flag_stop = false;
+
+    switch (c) {
+      case 'o':
+        flag_open = true;
+        break;
+      case 'c':
+        flag_close = true;
+        break;
+      case 's':
+        flag_stop = true;
+        break;
+      default:
+        break;
+    }
   }
 }
 
@@ -105,30 +168,35 @@ NIL_THREAD(commandExecution, arg) {
     if (flag_open) open_door(); 
     if (flag_close) close_door(); 
     if (flag_stop) stop_door();
-    nilThdSleepMilliseconds(100); 
+    nilThdSleepMilliseconds(10); 
   }
 }
 
 NIL_THREAD(processStatus, arg) {
-  char verbose[100];
+  char verbose[120];
+  sprintf(message, "begin");
+  sprintf(m1, "begin");
+  sprintf(m2, "begin");
+  
   while (true) {
     sprintf(
       verbose,
-      "s1Op: %d, s2Op: %d, s1Cl: %d, s2Cl: %d, status: %s",
-      digitalRead(s1_opn),
-      digitalRead(s2_opn),
-      digitalRead(s1_cls),
-      digitalRead(s2_cls),
-      message
+      "sensors: %d%d%d%d,   motors: %s - %s,    process: %s\r",
+      sensor1_open,
+      sensor1_close,
+      sensor2_open,
+      sensor2_close,
+      m1, m2, message
     );
-    Serial.println(verbose);
-    nilThdSleepMilliseconds(1000);
+    Serial.print(verbose);
+    read_sensors();
+    nilThdSleepMilliseconds(500);
   }
 }
 
-NIL_WORKING_AREA(waThread1, 64);
-NIL_WORKING_AREA(waThread2, 64);
-NIL_WORKING_AREA(waThread3, 64);
+NIL_WORKING_AREA(waThread1, 128);
+NIL_WORKING_AREA(waThread2, 128);
+NIL_WORKING_AREA(waThread3, 128);
 
 NIL_THREADS_TABLE_BEGIN()
 NIL_THREADS_TABLE_ENTRY("thread1", commandReader, NULL, waThread1, sizeof(waThread1))
@@ -145,4 +213,3 @@ void setup() {
 
 void loop() {
 }
-

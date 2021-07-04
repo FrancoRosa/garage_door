@@ -19,6 +19,12 @@
                 "C:\\Program Files (x86)\\Arduino\\hardware\\arduino\\avr\\variants\\eightanaloginputs",
                 "C:\\Users\\fx\\Documents\\Arduino\\libraries\\NilRTOS",
                 "C:\\Program Files (x86)\\Arduino\\hardware\\arduino\\avr\\libraries\\SoftwareSerial\\src",
+                "C:\\Users\\fx\\Documents\\Arduino\\libraries\\Motor",
+                "C:\\Program Files (x86)\\Arduino\\hardware\\arduino\\avr\\libraries\\Wire\\src",
+                "C:\\Users\\fx\\Documents\\Arduino\\libraries\\Adafruit_GFX_Library",
+                "C:\\Users\\fx\\Documents\\Arduino\\libraries\\Adafruit_SSD1306",
+                "C:\\Program Files (x86)\\Arduino\\hardware\\arduino\\avr\\libraries\\SPI\\src",
+                "C:\\Users\\fx\\Documents\\Arduino\\libraries\\Adafruit_BusIO",
                 "c:\\program files (x86)\\arduino\\hardware\\tools\\avr\\lib\\gcc\\avr\\5.4.0\\include",
                 "c:\\program files (x86)\\arduino\\hardware\\tools\\avr\\lib\\gcc\\avr\\5.4.0\\include-fixed",
                 "c:\\program files (x86)\\arduino\\hardware\\tools\\avr\\avr\\include"
