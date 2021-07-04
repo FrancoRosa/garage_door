@@ -2,5 +2,6 @@
     "sketch": "garage_door.ino",
     "configuration": "cpu=atmega328old",
     "board": "arduino:avr:nano",
-    "port": "COM10"
+    "port": "COM10",
+    "output": "build"
 }
