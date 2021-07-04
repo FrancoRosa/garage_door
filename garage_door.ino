@@ -1,4 +1,4 @@
-// Software serial to stablish communication by bluetooth
+#include <NilRTOS.h>
 #include <SoftwareSerial.h>
 
 // Sensor inputs to know if the doors are fully open or closed
@@ -10,6 +10,7 @@
 // Relay outputs
 #define buzzer   6
 #define doorlock 7
+#define led 13
 
 // Motor driver
 #define en1     8
@@ -26,15 +27,18 @@ bool flag_close = false;
 bool flag_stop = false;
 
 void open_door() {
-
+  Serial.println("... opening door");
+  flag_open=false;
 }
 
 void close_door() {
-  
+  Serial.println("... closing door");
+  flag_close=false;
 }
 
 void stop_door() {
-  
+  Serial.println("... stopping door");
+  flag_close=false;
 }
 
 void pinConfig() {
@@ -57,6 +61,8 @@ void pinConfig() {
 void serialConfig() {
   Serial.begin(115200);
   SerialBT.begin(9600);
+  Serial.println("... start debug serial");
+  SerialBT.println("... start bluetooth serial");
 }
 
 void processCommand() {
@@ -75,17 +81,39 @@ void processCommand() {
   }
 }
 
+NIL_THREAD(commandReader, arg) {
+  while (true) {
+    if (SerialBT.available()) {
+      processCommand();
+    }
+    nilThdSleepMilliseconds(100); 
+  }
+}
+
+NIL_THREAD(commandExecution, arg) {
+  while (true) {
+    if (flag_open) open_door(); 
+    if (flag_close) close_door(); 
+    if (flag_stop) stop_door();
+    nilThdSleepMilliseconds(100); 
+  }
+}
+
+NIL_WORKING_AREA(waThread1, 64);
+NIL_WORKING_AREA(waThread2, 64);
+
+NIL_THREADS_TABLE_BEGIN()
+NIL_THREADS_TABLE_ENTRY("thread1", commandReader, NULL, waThread1, sizeof(waThread1))
+NIL_THREADS_TABLE_ENTRY("thread2", commandExecution, NULL, waThread2, sizeof(waThread2))
+NIL_THREADS_TABLE_END()
+
+
 void setup() {
   pinConfig();
   serialConfig();
+  nilSysBegin();
 }
 
 void loop() {
-  if (SerialBT.available()) {
-    processCommand();
-  }
-
-  if (flag_open) open_door(); 
-  if (flag_close) close_door(); 
-  if (flag_stop) stop_door(); 
 }
+
